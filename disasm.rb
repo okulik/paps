@@ -55,8 +55,8 @@ class Disassembler
   
   def handle_mov_reg(buf)
     d, w, reg, rm = extract_flags(buf)
-    reg_str = mov_reg_to_str(reg, w)
-    rm_str = mov_reg_to_str(rm, w)
+    reg_str = mov_reg_to_s(reg, w)
+    rm_str = mov_reg_to_s(rm, w)
 
     src = d == 0 ? reg_str : rm_str
     dest = d == 0 ? rm_str : reg_str
@@ -66,12 +66,12 @@ class Disassembler
   
   def handle_mov_mem_no(buf)
     d, w, reg, rm = extract_flags(buf)
-    reg_str = mov_reg_to_str(reg, w)
+    reg_str = mov_reg_to_s(reg, w)
     if rm == 0b110
       rm_str = "[#{buf[@buf_index] + (buf[@buf_index+1] << 8)}]"
       @buf_index += 2
     else
-      rm_str = mov_mem_to_str(rm)
+      rm_str = mov_mem_to_s(rm)
     end
 
     src = d == 0 ? reg_str : rm_str
@@ -82,12 +82,12 @@ class Disassembler
   
   def handle_mov_mem_8_bit(buf)
     d, w, reg, rm = extract_flags(buf)
-    reg_str = mov_reg_to_str(reg, w)
+    reg_str = mov_reg_to_s(reg, w)
     disp = buf[@buf_index]
     @buf_index += 1
     disp = disp >= 0x80 ? disp - 0x100 : disp
     disp = nil if disp.zero?
-    rm_str = mov_mem_to_str(rm, d: disp)
+    rm_str = mov_mem_to_s(rm, d: disp)
 
     src = d == 0 ? reg_str : rm_str
     dest = d == 0 ? rm_str : reg_str
@@ -97,12 +97,12 @@ class Disassembler
   
   def handle_mov_mem_16_bit(buf)
     d, w, reg, rm = extract_flags(buf)
-    reg_str = mov_reg_to_str(reg, w)
+    reg_str = mov_reg_to_s(reg, w)
     disp = buf[@buf_index] + (buf[@buf_index+1] << 8)
     @buf_index += 2
     disp = disp >= 0x8000 ? disp - 0x10000 : disp
     disp = nil if disp.zero?
-    rm_str = mov_mem_to_str(rm, d: disp)
+    rm_str = mov_mem_to_s(rm, d: disp)
 
     src = d == 0 ? reg_str : rm_str
     dest = d == 0 ? rm_str : reg_str
@@ -124,7 +124,7 @@ class Disassembler
     reg = buf[@buf_index] & 0b00000111
     @buf_index += 1
     
-    dest = mov_reg_to_str(reg, w)
+    dest = mov_reg_to_s(reg, w)
     if w == 0
       src = buf[@buf_index]
       @buf_index += 1
@@ -151,10 +151,10 @@ class Disassembler
     end
 
     if mod == 0b000
-      dest = mov_mem_to_str(rm)
+      dest = mov_mem_to_s(rm)
       src = disp
     else
-      dest = mov_mem_to_str(rm, d: disp)
+      dest = mov_mem_to_s(rm, d: disp)
       if w == 0
         src = buf[@buf_index]
         @buf_index += 1
@@ -200,7 +200,7 @@ class Disassembler
     @out << "mov" << " " << "[#{dest}]" << ", " << src << "\n"
   end
 
-  def mov_reg_to_str(b, w)
+  def mov_reg_to_s(b, w)
     case b
     when 0b000
       w == 0 ? 'al' : 'ax'
@@ -223,32 +223,32 @@ class Disassembler
     end
   end
 
-  def mov_mem_to_str(b, d:nil)
+  def mov_mem_to_s(b, d:nil)
     if !d.nil?
       if d < 0
-        d = "- #{d*(-1)}"
+        d = " - #{d*(-1)}"
       else
-        d = "+ #{d}"
+        d = " + #{d}"
       end
     end
 
     case b
     when 0b000
-      d.nil? ? '[bx + si]' : "[bx + si #{d}]"
+      "[bx + si#{d}]"
     when 0b001
-      d.nil? ? '[bx + di]' : "[bx + di #{d}]"
+      "[bx + di#{d}]"
     when 0b010
-      d.nil? ? '[bp + si]' : "[bp + si #{d}]"
+      "[bp + si#{d}]"
     when 0b011
-      d.nil? ? '[bp + di]' : "[bp + di #{d}]"
+      "[bp + di#{d}]"
     when 0b100
-      d.nil? ? '[si]' : "[si #{d}]"
+      "[si#{d}]"
     when 0b101
-      d.nil? ? '[di]' : "[di #{d}]"
+      "[di#{d}]"
     when 0b110
-      d.nil? ? '[bp]' : "[bp #{d}]"
+      "[bp#{d}]"
     when 0b111
-      d.nil? ? '[bx]' : "[bx #{d}]"
+      "[bx#{d}]"
     else
       raise 'unknown reg/rm'
     end
@@ -256,11 +256,7 @@ class Disassembler
 end
 
 disasm = Disassembler.new(ARGV[0])
-begin
-  disasm.process
-rescue => e
-  puts ": #{e}"
-end
+disasm.process
 
 puts "bits 16"
 puts disasm.out.join("")
