@@ -85,6 +85,7 @@ class Disassembler
     reg_str = mov_reg_to_str(reg, w)
     disp = buf[@buf_index]
     @buf_index += 1
+    disp = disp >= 0x80 ? disp - 0x100 : disp
     disp = nil if disp.zero?
     rm_str = mov_mem_to_str(rm, d: disp)
 
@@ -99,6 +100,7 @@ class Disassembler
     reg_str = mov_reg_to_str(reg, w)
     disp = buf[@buf_index] + (buf[@buf_index+1] << 8)
     @buf_index += 2
+    disp = disp >= 0x8000 ? disp - 0x10000 : disp
     disp = nil if disp.zero?
     rm_str = mov_mem_to_str(rm, d: disp)
 
@@ -222,23 +224,31 @@ class Disassembler
   end
 
   def mov_mem_to_str(b, d:nil)
+    if !d.nil?
+      if d < 0
+        d = "- #{d*(-1)}"
+      else
+        d = "+ #{d}"
+      end
+    end
+
     case b
     when 0b000
-      d.nil? ? '[bx + si]' : "[bx + si + #{d}]"
+      d.nil? ? '[bx + si]' : "[bx + si #{d}]"
     when 0b001
-      d.nil? ? '[bx + di]' : "[bx + di + #{d}]"
+      d.nil? ? '[bx + di]' : "[bx + di #{d}]"
     when 0b010
-      d.nil? ? '[bp + si]' : "[bp + si + #{d}]"
+      d.nil? ? '[bp + si]' : "[bp + si #{d}]"
     when 0b011
-      d.nil? ? '[bp + di]' : "[bp + di + #{d}]"
+      d.nil? ? '[bp + di]' : "[bp + di #{d}]"
     when 0b100
-      d.nil? ? '[si]' : "[si + #{d}]"
+      d.nil? ? '[si]' : "[si #{d}]"
     when 0b101
-      d.nil? ? '[di]' : "[di + #{d}]"
+      d.nil? ? '[di]' : "[di #{d}]"
     when 0b110
-      d.nil? ? '[bp]' : "[bp + #{d}]"
+      d.nil? ? '[bp]' : "[bp #{d}]"
     when 0b111
-      d.nil? ? '[bx]' : "[bx + #{d}]"
+      d.nil? ? '[bx]' : "[bx #{d}]"
     else
       raise 'unknown reg/rm'
     end
