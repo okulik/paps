@@ -4,12 +4,14 @@ require_relative 'mov'
 require_relative 'add'
 require_relative 'sub'
 require_relative 'cmp'
+require_relative 'jmp'
 
 class Disassembler
   include Mov
   include Add
   include Sub
   include Cmp
+  include Jmp
 
   attr_reader :file_name, :out
 
@@ -35,6 +37,7 @@ class Disassembler
       handle_add(buf) ||
       handle_sub(buf) ||
       handle_cmp(buf) ||
+      handle_jumps(buf) ||
       raise("unknown instruction #{buf[@buf_index].to_s(2)}")
   end
 
