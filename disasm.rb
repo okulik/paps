@@ -2,10 +2,14 @@ require 'pry-byebug'
 
 require_relative 'mov'
 require_relative 'add'
+require_relative 'sub'
+require_relative 'cmp'
 
 class Disassembler
   include Mov
   include Add
+  include Sub
+  include Cmp
 
   attr_reader :file_name, :out
 
@@ -27,33 +31,18 @@ class Disassembler
   private
   
   def handle_instruction(buf)
-    if buf[@buf_index] >> 2 == 0b100010
-      handle_mov(buf)
-    elsif buf[@buf_index] >> 4 == 0b1011
-      handle_mov_immediate_to_reg(buf)
-    elsif buf[@buf_index] >> 1 == 0b1100011
-      handle_mov_immediate_to_reg_mem(buf)
-    elsif buf[@buf_index] >> 1 == 0b1010000
-      handle_mov_mem_to_acc(buf)
-    elsif buf[@buf_index] >> 1 == 0b1010001
-      handle_mov_acc_to_mem(buf)
-    elsif buf[@buf_index] >> 2 == 0b000000
-      handle_add(buf)
-    elsif buf[@buf_index] >> 2 == 0b100000
-      handle_add_immediate_to_reg_mem(buf)
-    elsif buf[@buf_index] >> 1 == 0b0000010
-      handle_add_immediate_to_acc(buf)
-    else
-      raise "unknown instruction #{buf[@buf_index].to_s(2)}"
-    end
+    handle_mov(buf) ||
+      handle_add(buf) ||
+      handle_sub(buf) ||
+      handle_cmp(buf) ||
+      raise("unknown instruction #{buf[@buf_index].to_s(2)}")
   end
-  
+
   def extract_flags(buf)
     d = (buf[@buf_index] >> 1) & 1
     w = buf[@buf_index] & 1
     reg = (buf[@buf_index+1] >> 3) & 0b111
     rm  = buf[@buf_index+1] & 0b111
-    @buf_index += 2
     return [d, w, reg, rm]
   end
 
@@ -80,34 +69,34 @@ class Disassembler
     end
   end
 
-  def mem_to_s(b, d:nil)
-    if !d.nil?
-      if d < 0
-        d = " - #{d*(-1)}"
-      elsif d > 0
-        d = " + #{d}"
+  def mem_to_s(rm, mod:, disp: nil)
+    if !disp.nil? && mod != 0b00
+      if disp < 0
+        disp = " - #{disp*(-1)}"
+      elsif disp > 0
+        disp = " + #{disp}"
       else
-        d = ""
+        disp = ""
       end
     end
 
-    case b
+    case rm
     when 0b000
-      "[bx + si#{d}]"
+      "[bx + si#{disp}]"
     when 0b001
-      "[bx + di#{d}]"
+      "[bx + di#{disp}]"
     when 0b010
-      "[bp + si#{d}]"
+      "[bp + si#{disp}]"
     when 0b011
-      "[bp + di#{d}]"
+      "[bp + di#{disp}]"
     when 0b100
-      "[si#{d}]"
+      "[si#{disp}]"
     when 0b101
-      "[di#{d}]"
+      "[di#{disp}]"
     when 0b110
-      "[bp#{d}]"
+      mod == 0b00 ? "[#{disp}]" : "[bp#{disp}]"
     when 0b111
-      "[bx#{d}]"
+      mod == 0b00 ? "[bx]" : "[bx#{disp}]"
     else
       raise 'unknown reg/rm'
     end
